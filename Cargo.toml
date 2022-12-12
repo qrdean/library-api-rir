@@ -17,6 +17,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0.48"
 tower = { version = "0.4", features = ["util"] }
+thiserror = "1.0.30"
 
 [dependencies.sqlx]
 version = "0.6"

@@ -33,7 +33,7 @@ async fn shutdown_signal() {
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminal())
+        signal::unix::signal(signal::unix::SignalKind::interrupt())
             .expect("failed to install signal handler")
             .recv()
             .await;
