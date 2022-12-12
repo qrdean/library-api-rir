@@ -14,7 +14,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let addr = std::net::SocketAddr::from(([127,0,0,1],8081));
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8081));
     Server::bind(&addr)
         .serve(app().into_make_service())
         .with_graceful_shutdown(shutdown_signal())
@@ -23,7 +23,7 @@ async fn main() {
     println!("stuff")
 }
 
-/// Graceful Shutdown of the endpoint 
+/// Graceful Shutdown of the endpoint
 async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
@@ -49,4 +49,3 @@ async fn shutdown_signal() {
 
     println!("signal received, starting graceful shutdown");
 }
-

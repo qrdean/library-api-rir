@@ -1,13 +1,20 @@
-use axum::{Router,Json};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use axum::routing::get;
+use axum::{Json, Router};
 
 use tower::ServiceBuilder;
-use tracing::Level;
+use tower_http::trace::{
+    DefaultMakeSpan, DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer,
+};
 use tower_http::LatencyUnit;
-use tower_http::trace::{TraceLayer, DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, DefaultOnFailure};
+use tracing::Level;
 
 use crate::routes::Result;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct BookBody<T = BookQuery> {
+    book: T,
+}
 
 #[derive(serde::Serialize, Default)]
 struct Book {
@@ -19,11 +26,6 @@ struct Book {
     lccn: String,
     isbn: String,
     publish_date: String,
-} 
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct BookBody<T = BookQuery> {
-    book: T,
 }
 
 #[derive(serde::Deserialize)]
@@ -37,7 +39,7 @@ struct BookQuery {
 
 #[derive(serde::Serialize, Default)]
 struct BooksQuery {
-    books: Vec<Book>
+    books: Vec<Book>,
 }
 
 #[derive(serde::Deserialize)]
@@ -52,7 +54,7 @@ struct BookUpdateQuery {
 
 #[derive(serde::Deserialize)]
 struct DeleteBook {
-    id: i32
+    id: i32,
 }
 
 async fn hello() -> (StatusCode, String) {
@@ -65,18 +67,24 @@ async fn hello_post() -> (StatusCode, String) {
 
 async fn get_list_books() -> (StatusCode, Json<BooksQuery>) {
     let mut books = BooksQuery::default();
-    books.books.push(Book { id: 1, ..Default::default() });
-    books.books.push(Book { id: 2, ..Default::default() });
+    books.books.push(Book {
+        id: 1,
+        ..Default::default()
+    });
+    books.books.push(Book {
+        id: 2,
+        ..Default::default()
+    });
 
     (StatusCode::OK, Json(books))
 }
 
-async fn get_book(request: Json<BookBody<DeleteBook>>) 
-    -> Result<(StatusCode, Json<Book>), (StatusCode, String)> 
-{
+async fn get_book(
+    request: Json<BookBody<DeleteBook>>,
+) -> Result<(StatusCode, Json<Book>), (StatusCode, String)> {
     let id = request.book.id;
     if id > 50 {
-       return Err((StatusCode::NOT_FOUND, "Book Id not found".to_string()))
+        return Err((StatusCode::NOT_FOUND, "Book Id not found".to_string()));
     }
     Ok((StatusCode::OK, Json(Book::default())))
 }
@@ -90,9 +98,9 @@ async fn create_book(request: Json<BookBody<BookQuery>>) -> (StatusCode, String)
     (StatusCode::OK, "Book Created".to_string())
 }
 
-async fn delete_book(request: Json<BookBody<DeleteBook>>) 
-    -> Result<(StatusCode, String), (StatusCode, String)> 
-{
+async fn delete_book(
+    request: Json<BookBody<DeleteBook>>,
+) -> Result<(StatusCode, String), (StatusCode, String)> {
     let id = request.book.id;
     // simulate id not being there
     if id > 50 {
@@ -102,9 +110,9 @@ async fn delete_book(request: Json<BookBody<DeleteBook>>)
     }
 }
 
-async fn update_book(request: Json<BookBody<BookUpdateQuery>>) 
-    -> Result<(StatusCode, String), (StatusCode, String)> 
-{
+async fn update_book(
+    request: Json<BookBody<BookUpdateQuery>>,
+) -> Result<(StatusCode, String), (StatusCode, String)> {
     let id = request.book.id;
     // simulate id not being there
     if id > 50 {
@@ -123,23 +131,24 @@ pub fn app() -> Router {
     Router::new()
         .route("/api/healthcheck", get(hello).post(hello_post))
         .route("/api/books/list", get(get_list_books))
-        .route("/api/books", get(get_book).post(create_book).put(update_book).delete(delete_book))
-        .layer(ServiceBuilder::new()
-            .layer(TraceLayer::new_for_http()
-                .make_span_with(
-                    DefaultMakeSpan::new().include_headers(true)
-                )
-                .on_request(
-                    DefaultOnRequest::new().level(Level::INFO)
-                )
-                .on_response(
-                    DefaultOnResponse::new()
-                        .level(Level::INFO)
-                        .latency_unit(LatencyUnit::Micros)
-                )
-                .on_failure(
-                    DefaultOnFailure::new().level(Level::ERROR)
-                )
+        .route(
+            "/api/books",
+            get(get_book)
+                .post(create_book)
+                .put(update_book)
+                .delete(delete_book),
+        )
+        .layer(
+            ServiceBuilder::new().layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(DefaultMakeSpan::new().include_headers(true))
+                    .on_request(DefaultOnRequest::new().level(Level::INFO))
+                    .on_response(
+                        DefaultOnResponse::new()
+                            .level(Level::INFO)
+                            .latency_unit(LatencyUnit::Micros),
+                    )
+                    .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
             ),
         )
 }

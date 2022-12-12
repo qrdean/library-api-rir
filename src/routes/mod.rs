@@ -1,5 +1,5 @@
-mod server;
 mod error;
+mod server;
 
-pub use server::*;
 pub use error::*;
+pub use server::*;
