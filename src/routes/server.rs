@@ -1,6 +1,8 @@
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
+use axum::extract::State;
+use sqlx::PgPool;
 
 use tower::ServiceBuilder;
 use tower_http::trace::{
@@ -31,7 +33,7 @@ struct Book {
 #[derive(serde::Deserialize)]
 struct BookQuery {
     lccn: String,
-    isbn: Option<String>,
+    isbn: String,
     title: String,
     author: String,
     publish_date: String,
@@ -80,8 +82,10 @@ async fn get_list_books() -> (StatusCode, Json<BooksQuery>) {
 }
 
 async fn get_book(
+    State(api_context): State<ApiContext>,
     request: Json<BookBody<DeleteBook>>,
 ) -> Result<(StatusCode, Json<Book>), (StatusCode, String)> {
+    let _connection_pool = &api_context.db;
     let id = request.book.id;
     if id > 50 {
         return Err((StatusCode::NOT_FOUND, "Book Id not found".to_string()));
@@ -89,7 +93,24 @@ async fn get_book(
     Ok((StatusCode::OK, Json(Book::default())))
 }
 
-async fn create_book(request: Json<BookBody<BookQuery>>) -> (StatusCode, String) {
+async fn create_book(
+    State(api_context): State<ApiContext>,
+    request: Json<BookBody<BookQuery>>
+) -> (StatusCode, String) {
+    let connection_pool = &api_context.db;
+    let book_id = sqlx::query_scalar!(
+        // language=PostgreSQL
+        r#"insert into "master_book" (author, title, lccn, isbn, publish_date) values ($1, $2, $3, $4, $5) returning master_book_id"#,
+        request.book.author,
+        request.book.title,
+        request.book.lccn,
+        request.book.isbn,
+        request.book.publish_date
+    )
+    .fetch_one(connection_pool)
+    .await
+    .expect("failed to insert into master_book")
+    ;
     println!("{:?}", &request.book.lccn);
     println!("{:?}", &request.book.isbn);
     println!("{:?}", &request.book.title);
@@ -111,10 +132,22 @@ async fn delete_book(
 }
 
 async fn update_book(
+    State(api_context): State<ApiContext>,
     request: Json<BookBody<BookUpdateQuery>>,
 ) -> Result<(StatusCode, String), (StatusCode, String)> {
     let id = request.book.id;
-    // simulate id not being there
+    /*
+    let user_id = sqlx::query_scalar!(
+        // language=PostgreSQL
+        r#"insert into "master_book" (author, title, lccn, isbn, publish_date) values ($1, $2, $3) returning user_id"#,
+        req.user.username,
+        req.user.email,
+        password_hash
+    )
+    .fetch_one(&db)
+    .await?
+    ;
+    */
     if id > 50 {
         Err((StatusCode::NOT_FOUND, "Book Id Not Found".to_string()))
     } else {
@@ -127,7 +160,17 @@ async fn update_book(
     }
 }
 
-pub fn app() -> Router {
+#[derive(Clone)]
+struct ApiContext {
+    db: PgPool,
+}
+
+pub fn app(db: PgPool) -> Router {
+    let api_context = ApiContext { db };
+    return api_router(api_context);
+}
+
+fn api_router(api_context: ApiContext) -> Router {
     Router::new()
         .route("/api/healthcheck", get(hello).post(hello_post))
         .route("/api/books/list", get(get_list_books))
@@ -138,8 +181,10 @@ pub fn app() -> Router {
                 .put(update_book)
                 .delete(delete_book),
         )
+        .with_state(api_context)
         .layer(
-            ServiceBuilder::new().layer(
+            ServiceBuilder::new()
+                .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().include_headers(true))
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
@@ -151,4 +196,5 @@ pub fn app() -> Router {
                     .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
             ),
         )
+
 }

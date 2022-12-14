@@ -3,13 +3,23 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 //use tower::Service;
 use library_app_rir::routes::app;
 use tower::ServiceExt;
 
 #[tokio::test]
 async fn hello_world() {
-    let app = app();
+    let database_url = "postgresql://postgres:password@localhost:5432/library".to_string();
+
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("couldnt connect to database url");
+
+    let app = app(db);
 
     // `Router` implements `tower::Service<Request<Body>>` so we can
     // call it like any tower service, no need to run an HTTP server.
@@ -32,7 +42,15 @@ async fn hello_world() {
 
 #[tokio::test]
 async fn hello_post() {
-    let app = app();
+    let database_url = "postgresql://postgres:password@localhost:5432/library";
+
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("couldnt connect to database url");
+
+    let app = app(db);
 
     // `Router` implements `tower::Service<Request<Body>>` so we can
     // call it like any tower service, no need to run an HTTP server.
@@ -52,3 +70,4 @@ async fn hello_post() {
     let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
     assert_eq!(&body[..], b"hello post");
 }
+

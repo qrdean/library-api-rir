@@ -1,4 +1,5 @@
 use axum::Server;
+use sqlx::postgres::PgPoolOptions;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -14,9 +15,17 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let database_url = "postgresql://postgres:password@localhost:5432/library".to_string();
+
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("couldnt connect to database url");
+
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8081));
     Server::bind(&addr)
-        .serve(app().into_make_service())
+        .serve(app(db).into_make_service())
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
