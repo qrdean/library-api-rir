@@ -5,8 +5,11 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use library_app_rir::routes::app;
 
+/// Spins up our app, sets debug level, gets the database started and binds
+/// our server.
 #[tokio::main]
 async fn main() {
+    println!("Server Spinning Up");
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -29,7 +32,7 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
-    println!("stuff")
+    println!("Server Shutting Down");
 }
 
 /// Graceful Shutdown of the endpoint

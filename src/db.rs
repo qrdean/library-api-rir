@@ -4,6 +4,9 @@ use sqlx::PgPool;
 
 use crate::routes::{BookFromQuery, BookQuery, BookUpdateQuery};
 
+/// A catch all Database Structure to encapsulate our Queries
+/// Should Probably split these by table as it grows and move to its own 
+/// module folder
 pub struct Db;
 
 impl Db {
