@@ -70,4 +70,3 @@ async fn hello_post() {
     let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
     assert_eq!(&body[..], b"hello post");
 }
-

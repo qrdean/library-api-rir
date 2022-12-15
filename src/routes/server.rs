@@ -1,9 +1,10 @@
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
-use axum::extract::State;
+use sqlx::types::Uuid;
 use sqlx::PgPool;
-use uuid::Uuid;
+//use uuid::Uuid;
 
 use tower::ServiceBuilder;
 use tower_http::trace::{
@@ -12,6 +13,8 @@ use tower_http::trace::{
 use tower_http::LatencyUnit;
 use tracing::Level;
 
+use crate::db::Db;
+use crate::routes::ApiError;
 use crate::routes::Result;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -20,19 +23,10 @@ struct BookBody<T = BookQuery> {
 }
 
 #[derive(serde::Serialize, Default)]
-struct Book {
+pub struct Book {
     id: Uuid,
     master_id: Option<Uuid>,
     location_id: Option<Uuid>,
-    author: String,
-    title: String,
-    lccn: String,
-    isbn: String,
-    publish_date: String,
-}
-
-struct BookFromQuery {
-    master_book_id: Uuid,
     author: Option<String>,
     title: Option<String>,
     lccn: Option<String>,
@@ -40,28 +34,39 @@ struct BookFromQuery {
     publish_date: Option<String>,
 }
 
+#[derive(Clone)]
+pub struct BookFromQuery {
+    pub master_book_id: Uuid,
+    pub author: Option<String>,
+    pub title: Option<String>,
+    pub lccn: Option<String>,
+    pub isbn: Option<String>,
+    pub publish_date: Option<String>,
+}
+
 impl BookFromQuery {
-    fn to_book(self) -> Book {
-        Book { 
+    fn to_book(&self) -> Book {
+        let this = self.to_owned();
+        Book {
             id: self.master_book_id,
             master_id: None,
             location_id: None,
-            author: self.author.unwrap_or("".to_string()),
-            title: self.title.unwrap_or("".to_string()), 
-            lccn: self.lccn.unwrap_or("".to_string()),
-            isbn: self.isbn.unwrap_or("".to_string()),
-            publish_date: self.publish_date.unwrap_or("".to_string()) 
+            author: this.author,
+            title: this.title,
+            lccn: this.lccn,
+            isbn: this.isbn,
+            publish_date: this.publish_date,
         }
     }
 }
 
-#[derive(serde::Deserialize)]
-struct BookQuery {
-    lccn: String,
-    isbn: String,
-    title: String,
-    author: String,
-    publish_date: String,
+#[derive(serde::Deserialize, Clone)]
+pub struct BookQuery {
+    pub lccn: String,
+    pub isbn: String,
+    pub title: String,
+    pub author: String,
+    pub publish_date: String,
 }
 
 #[derive(serde::Serialize, Default)]
@@ -69,14 +74,14 @@ struct BooksQuery {
     books: Vec<Book>,
 }
 
-#[derive(serde::Deserialize)]
-struct BookUpdateQuery {
-    id: Uuid,
-    lccn: Option<String>,
-    isbn: Option<String>,
-    title: Option<String>,
-    author: Option<String>,
-    publish_date: Option<String>,
+#[derive(serde::Deserialize, Clone)]
+pub struct BookUpdateQuery {
+    pub id: Uuid,
+    pub lccn: Option<String>,
+    pub isbn: Option<String>,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub publish_date: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -98,125 +103,62 @@ async fn hello_post() -> (StatusCode, String) {
 }
 
 async fn get_list_books(
-    State(api_context): State<ApiContext>
-) -> (StatusCode, Json<BooksQuery>) {
+    State(api_context): State<ApiContext>,
+) -> Result<(StatusCode, Json<BooksQuery>), ApiError> {
     let connection_pool = &api_context.db;
 
-    let book_list = sqlx::query!(
-        r#"select * from "master_book" limit 200"#,
-    ).fetch_all(connection_pool).await.expect("couldnt pull books");
+    let list = Db::get_book_list(connection_pool).await?;
+    let books = list.iter().map(|book| book.to_book()).collect();
 
-    let mut books_q = vec![];
-    for book in book_list.iter() {
-        let book_b = Book {
-            id: book.master_book_id,
-            location_id: None,
-            master_id: None,
-            isbn: book.isbn.to_owned().unwrap_or("".to_string()),
-            lccn: book.lccn.to_owned().unwrap_or("".to_string()),
-            title: book.title.to_owned().unwrap_or("".to_string()),
-            author: book.author.to_owned().unwrap_or("".to_string()),
-            publish_date: book.publish_date.to_owned().unwrap_or("".to_string())
-        };
-        books_q.push(book_b);
-    }
-    //let booksQ = BooksQuery { books:  };
-    (StatusCode::OK, Json(BooksQuery { books: books_q}))
+    Ok((StatusCode::OK, Json(BooksQuery { books })))
 }
 
 async fn get_book(
     State(api_context): State<ApiContext>,
     request: Json<BookBody<GetBookQuery>>,
-) -> Result<(StatusCode, Json<Book>), (StatusCode, String)> {
+) -> Result<(StatusCode, Json<Book>), ApiError> {
     let connection_pool = &api_context.db;
     let id = &request.book.id;
-    let book = sqlx::query!(
-        r#"select * from "master_book" where master_book_id = $1"#,
-        id
-    )
-    .fetch_one(connection_pool)
-    .await
-    .expect("failed to get book");
-    Ok((StatusCode::OK, Json(Book {
-        id: book.master_book_id,
-        master_id: None,
-        location_id: None,
-        title: book.title.unwrap_or("".to_string()),
-        author: book.author.unwrap_or("".to_string()),
-        lccn: book.lccn.unwrap_or("".to_string()),
-        isbn: book.isbn.unwrap_or("".to_string()),
-        publish_date: book.publish_date.unwrap_or("".to_string())
 
-    })))
+    let book_from_query = Db::get_book(id, connection_pool).await?;
+
+    Ok((StatusCode::OK, Json(book_from_query.to_book())))
 }
 
 async fn create_book(
     State(api_context): State<ApiContext>,
-    request: Json<BookBody<BookQuery>>
-) -> (StatusCode, String) {
+    request: Json<BookBody<BookQuery>>,
+) -> Result<(StatusCode, String), ApiError> {
     let connection_pool = &api_context.db;
-    let book_id = sqlx::query_scalar!(
-        // language=PostgreSQL
-        r#"insert into "master_book" (author, title, lccn, isbn, publish_date) values ($1, $2, $3, $4, $5) returning master_book_id"#,
-        request.book.author,
-        request.book.title,
-        request.book.lccn,
-        request.book.isbn,
-        request.book.publish_date
-    )
-    .fetch_one(connection_pool)
-    .await
-    .expect("failed to insert into master_book");
+    let book = request.book.to_owned();
+    let book_query = BookQuery {
+        isbn: book.isbn,
+        lccn: book.lccn,
+        title: book.title,
+        author: book.author,
+        publish_date: book.publish_date,
+    };
+    let book_id = Db::create_book(book_query, connection_pool).await?;
 
-    println!("{:?}", &request.book.lccn);
-    println!("{:?}", &request.book.isbn);
-    println!("{:?}", &request.book.title);
-    println!("{:?}", &request.book.author);
-    println!("{:?}", &request.book.publish_date);
-    (StatusCode::OK, "Book Created".to_string())
+    Ok((StatusCode::OK, book_id.to_string()))
 }
 
 async fn update_book(
     State(api_context): State<ApiContext>,
     Json(request): Json<BookBody<BookUpdateQuery>>,
-) -> Result<(StatusCode, Json<Book>), (StatusCode, String)> {
+) -> Result<(StatusCode, Json<Book>), ApiError> {
     let connection_pool = &api_context.db;
-    let author = &request.book.author.unwrap_or("".to_string());
-    let updated_book = sqlx::query_as!(
-        BookFromQuery,
-        r#"
-        with updated_book as (
+    let book_body = request.book.to_owned();
+    let book_query = BookUpdateQuery {
+        id: book_body.id,
+        isbn: book_body.isbn,
+        lccn: book_body.lccn,
+        title: book_body.title,
+        author: book_body.author,
+        publish_date: book_body.publish_date,
+    };
 
-        update "master_book" 
-           set 
-               author = coalesce($2, author),
-               title = coalesce($3, title),
-               lccn = coalesce($4, lccn),
-               isbn = coalesce($5, isbn),
-               publish_date = coalesce($6, publish_date)
-        where master_book_id = $1
-        returning 
-                master_book_id, author, title, lccn, isbn, publish_date
-        )
-        select 
-           updated_book.master_book_id master_book_id,
-           updated_book.author author,
-           updated_book.title title,
-           updated_book.lccn lccn,
-           updated_book.isbn isbn,
-           updated_book.publish_date publish_date
-        from updated_book    
-        "#,
-        request.book.id,
-        author,
-        request.book.title.unwrap_or("".to_string()),
-        request.book.lccn.unwrap_or("".to_string()),
-        request.book.isbn.unwrap_or("".to_string()),
-        request.book.publish_date.unwrap_or("".to_string()),
-    )
-    .fetch_one(connection_pool)
-    .await
-    .expect("failed to update and fetch");
+    let updated_book = Db::update_book(book_query, connection_pool).await?;
 
     let book = updated_book.to_book();
 
@@ -226,17 +168,13 @@ async fn update_book(
 async fn delete_book(
     State(api_context): State<ApiContext>,
     request: Json<BookBody<DeleteBook>>,
-) -> Result<(StatusCode, String), (StatusCode, String)> {
+) -> Result<(StatusCode, String), ApiError> {
     let connection_pool = &api_context.db;
 
-    let result = sqlx::query!(
-        r#"delete from "master_book" where master_book_id=$1"#,
-        request.book.id
-    ).execute(connection_pool).await.expect("couldnt delete books");
+    let result = Db::delete_book(request.book.id, connection_pool).await?;
 
-    Ok((StatusCode::OK, "Book Deleted".to_string()))
+    Ok((StatusCode::OK, result.rows_affected().to_string()))
 }
-
 
 #[derive(Clone)]
 struct ApiContext {
@@ -261,8 +199,7 @@ fn api_router(api_context: ApiContext) -> Router {
         )
         .with_state(api_context)
         .layer(
-            ServiceBuilder::new()
-                .layer(
+            ServiceBuilder::new().layer(
                 TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().include_headers(true))
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
@@ -274,5 +211,4 @@ fn api_router(api_context: ApiContext) -> Router {
                     .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
             ),
         )
-
 }

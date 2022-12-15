@@ -163,6 +163,28 @@ impl IntoResponse for Error {
     }
 }
 
+pub enum ApiError {
+    DatabaseError(sqlx::Error),
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        match self {
+            ApiError::DatabaseError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "An Unexpected Error Has Occurred",
+            )
+                .into_response(),
+        }
+    }
+}
+
+impl From<sqlx::Error> for ApiError {
+    fn from(e: sqlx::Error) -> Self {
+        ApiError::DatabaseError(e)
+    }
+}
+
 /// A little helper trait for more easily converting database constraint errors into API errors.
 ///
 /// ```rust,ignore
