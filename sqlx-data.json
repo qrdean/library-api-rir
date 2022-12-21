@@ -1,0 +1,192 @@
+{
+  "db": "PostgreSQL",
+  "135535952092db8b5d76c2e663067da161cfa32065556b55f33bb833a8dd7dea": {
+    "describe": {
+      "columns": [
+        {
+          "name": "master_book_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "author",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "title",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "lccn",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "isbn",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "publish_date",
+          "ordinal": 5,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            with updated_book as (\n\n            update \"master_book\" \n               set \n                   author = coalesce($2, author),\n                   title = coalesce($3, title),\n                   lccn = coalesce($4, lccn),\n                   isbn = coalesce($5, isbn),\n                   publish_date = coalesce($6, publish_date)\n            where master_book_id = $1\n            returning \n                    master_book_id, author, title, lccn, isbn, publish_date\n            )\n            select \n               updated_book.master_book_id master_book_id,\n               updated_book.author author,\n               updated_book.title title,\n               updated_book.lccn lccn,\n               updated_book.isbn isbn,\n               updated_book.publish_date publish_date\n            from updated_book    \n            "
+  },
+  "657e6a723e57d569f6e2ccabbfdfb5cf84d341f8b7757d2748a07eb8c36f2f6d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "master_book_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "author",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "title",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "lccn",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "isbn",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "publish_date",
+          "ordinal": 5,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "select \n                master_book_id, \n                author,\n                title,\n                lccn,\n                isbn,\n                publish_date\n            from \"master_book\" limit 200"
+  },
+  "6f19d3d366307daf1c9c3d1c2dea1e42b11c3c3abef8d8a389166a79428aa248": {
+    "describe": {
+      "columns": [
+        {
+          "name": "master_book_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "author",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "title",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "lccn",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "isbn",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "publish_date",
+          "ordinal": 5,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "select \n                master_book_id, \n                author,\n                title,\n                lccn,\n                isbn,\n                publish_date\n            from \"master_book\" where master_book_id = $1"
+  },
+  "96e30d4cde3748ea3ce7848b12788242f34fada319304f1d792f0716d265dc83": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "delete from \"master_book\" where master_book_id=$1"
+  },
+  "9fba9e9b165632a1cde0b1ea8c82b21e65e2ba6ca261eaad545e23b34219655f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "master_book_id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "insert into \"master_book\" (author, title, lccn, isbn, publish_date) values ($1, $2, $3, $4, $5) returning master_book_id"
+  }
+}

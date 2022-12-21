@@ -3,7 +3,7 @@ use sqlx::postgres::PgPoolOptions;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use library_app_rir::routes::app;
+use library_api_rir::routes::app;
 
 /// Spins up our app, sets debug level, gets the database started and binds
 /// our server.
