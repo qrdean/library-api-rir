@@ -7,6 +7,7 @@ CREATE TABLE master_book(
   lccn text null,
   isbn text null,
   publish_date text null,
+  status text null,
   create_at timestamptz not null default now(),
   updated_at timestamptz
 );
