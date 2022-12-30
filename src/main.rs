@@ -18,7 +18,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let database_url = "postgresql://postgres:password@localhost:5432/library".to_string();
+    let database_url = option_env!("DATABASE_URL")
+        .unwrap_or("$DATABASE_URL not set")
+        .to_string();
 
     let db = PgPoolOptions::new()
         .max_connections(5)
