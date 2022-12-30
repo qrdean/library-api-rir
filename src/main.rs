@@ -22,6 +22,8 @@ async fn main() {
         .unwrap_or("$DATABASE_URL not set")
         .to_string();
 
+    println!("db_url: {:?}", &database_url);
+
     let db = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
