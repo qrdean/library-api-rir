@@ -10,6 +10,11 @@ use library_api_rir::routes::app;
 #[tokio::main]
 async fn main() {
     println!("Server Spinning Up");
+
+    for (n,v) in std::env::vars() {
+        println!("{}: {}", n,v);
+    }
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
