@@ -23,7 +23,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let optional_database_url = option_env!("DATABASE_URL");
+    let optional_database_url = std::env::var("DATABASE_URL");
 
     println!("db_url: {:?}", &optional_database_url);
 
