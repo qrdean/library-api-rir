@@ -31,6 +31,8 @@ async fn main() {
         .unwrap()
         .to_string();
 
+    println!("db_url: {:?}", &database_url);
+
     let db = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
