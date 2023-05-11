@@ -23,13 +23,11 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let optional_database_url = option_env!("DATABASE_URL");
-
-    println!("db_url: {:?}", &optional_database_url);
-
-    let database_url = optional_database_url
+    let database_url = std::env::var("DATABASE_URL")
         .unwrap()
         .to_string();
+
+    println!("db_url: {:?}", &database_url);
 
     let db = PgPoolOptions::new()
         .max_connections(5)
